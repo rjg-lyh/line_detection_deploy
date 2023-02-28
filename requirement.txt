@@ -1,0 +1,4 @@
+#不建议直接运行该文件，而是手动一个个安装
+#因为会顺带安装别的包，破坏了当前环境
+
+pip install matplotlib torchstat tqdm visdom==0.1.8.9 mtutils albumentations==0.5.0

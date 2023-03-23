@@ -30,9 +30,9 @@ def get_argparser():
     parser = argparse.ArgumentParser()  #IMG_20221006_125547_aug0  IMG_20221013_124427  IMG_20221013_125206_aug2（典型 rotate=15 IoU_threshold=0.8）
                                         #IMG_20221013_124515_aug1 IMG_20221006_132459(杂草) IMG_20221013_124448（train 正常 偏移 rotate=-15 threshold=0.5）
                                         #IMG_20221006_131948(杂草)
-    parser.add_argument('--demo_img',  type=str, default='/home/rjg/dataset2/images/val/IMG_20221013_125206_aug2.jpg',
+    parser.add_argument('--demo_img',  type=str, default='/home/nvidia/project/ceshi.jpg',
                         help='the path of the demo image')
-    parser.add_argument('--ckpt_path',  type=str, default='/home/rjg/下载/best_AttU_Net.pth',
+    parser.add_argument('--ckpt_path',  type=str, default='/home/nvidia/project/best_AttU_Net.pth',
                         help='the path of the pretrained .pth')
     parser.add_argument('--model', type=str, default='AttU_Net',
                         choices=['UNet', 'LBDNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],

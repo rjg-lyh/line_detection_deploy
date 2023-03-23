@@ -214,6 +214,8 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
     metrics_4.reset()
     metrics_5.reset()
     ret_samples = []
+
+    model.eval()
     with torch.no_grad():
         
         for i, (images, labels) in tqdm(enumerate(loader)):

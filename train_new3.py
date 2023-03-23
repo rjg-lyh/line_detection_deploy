@@ -222,6 +222,8 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
     metrics_4.reset()
     metrics_5.reset()
     ret_samples = []
+
+    model.eval()
     with torch.no_grad():
         
         for i, (images, labels) in tqdm(enumerate(loader)):
@@ -479,7 +481,7 @@ def main():
         model.load_state_dict(torch.load(best_ckpt)["model_state"])
         save_best_img(opts=opts, model=model, loader=val_loader, device=device)
     
-    device1 = torch.device('cpu')
+    device1 = ('cpu')
     Total_Params = stat(model.to(device1), (opts.input_channel, opts.crop_size, opts.crop_size))
     #Save 'config_info' and 'best_info'
     with open(logs_filename,'a') as f:

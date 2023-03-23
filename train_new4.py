@@ -185,6 +185,8 @@ def save_best_img(opts, model, loader, device):
 
 def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
     ret_samples = []
+
+    model.eval()
     with torch.no_grad():
         
         for i, (images, labels) in tqdm(enumerate(loader)):
@@ -334,6 +336,7 @@ def main():
         with open(logs_filename, 'a') as f:
             division_line = f'Epoch_{cur_epoch}'.center(100, '-')
             f.writelines(f'{division_line}\nTrain:\n\n')
+            
         model.train()
         for (images, labels) in train_loader:
             start_time = time.time()

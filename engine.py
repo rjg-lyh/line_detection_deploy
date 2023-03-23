@@ -1,10 +1,27 @@
 from typing import Union, Optional, Sequence,Dict,Any 
+import argparse
 import numpy as np
 import torch 
 import tensorrt as trt 
 from PIL import Image
 import torchvision.transforms.functional as F
 from torchvision.transforms import InterpolationMode
+from modeling import UNet, DGLNet, AttU_Net, R2AttU_Net, deeplab_resnet50, deeplab_mobilenetv2, Scnn_AttU_Net
+
+def get_argparser():
+    parser = argparse.ArgumentParser()  
+    parser.add_argument('--demo_img',  type=str, default='/home/nvidia/project/ceshi.jpg',
+                        help='the path of the demo image')
+    parser.add_argument('--ckpt_path',  type=str, default='/home/nvidia/project/best_AttU_Net.pth',
+                        help='the path of the pretrained .pth')
+    parser.add_argument('--model', type=str, default='AttU_Net',
+                        choices=['UNet', 'LBDNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],
+                        help='model name')
+    parser.add_argument('--input_channel', type=int, default=3,
+                        help='the channel of the input image')             
+    parser.add_argument('--num_classes', type=int, default=4,
+                        help='num classes in seg_task')
+    return parser
 
 def preprocess(demo_img):
     img = F.rotate(demo_img, 15)
@@ -74,12 +91,36 @@ class TRTWrapper(torch.nn.Module):
         return outputs 
 
 if __name__ == '__main__':
-    img_path = '/home/rjg/dataset2/images/val/IMG_20221013_125206_aug2.jpg'
-    demo_img = Image.open(img_path).convert('RGB')
-    input = preprocess(demo_img)
-    input = input.unsqueeze(0) 
+    opts = get_argparser().parse_args()
 
-    model = TRTWrapper('model.engine', ['output']) 
-    output = model(dict(input = input.cuda())) 
-    pred = output['output']
-    print(pred.shape)
+    model_map = {
+            'UNet':UNet,
+            'LBDNet':DGLNet,
+            'AttU_Net':AttU_Net, 
+            'R2AttU_Net':R2AttU_Net,
+            'Scnn_AttU_Net':Scnn_AttU_Net,
+            'deeplab_resnet50':deeplab_resnet50,
+            'deeplab_mobilenetv2':deeplab_mobilenetv2,
+            }
+    demo_img = Image.open(opts.demo_img).convert('RGB')
+    input = preprocess(demo_img)
+    input = input.unsqueeze(0)
+    #pytorch_model
+    model_pytorch = model_map[opts.model](opts)
+    model_pytorch.load_state_dict(torch.load(opts.ckpt_path, map_location=torch.device('cpu'))["model_state"])
+    model_pytorch.to('cuda')
+    out_pytorch = model_pytorch(input.cuda())
+
+    #trt
+    model_trt = TRTWrapper('model.engine', ['output']) 
+    out_trt = model_trt(dict(input = input.cuda()))['output']
+
+
+    #compart
+    print(out_pytorch[0,:])
+    print(out_trt[0,:])
+
+    #print(out_pytorch.shape)    
+    #print(out_trt.shape)
+    #print(torch.max(torch.abs(out_pytorch - out_trt)))
+    #print(torch.isclose(out_pytorch, out_trt))

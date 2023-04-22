@@ -177,7 +177,7 @@ if __name__ == '__main__':
 
 
 
-    '''
+    #'''
     # create builder and network 
     logger = trt.Logger(trt.Logger.ERROR) 
     builder = trt.Builder(logger) 
@@ -207,5 +207,5 @@ if __name__ == '__main__':
     with open('model.engine', mode='wb') as f: 
         f.write(bytearray(engine.serialize())) 
         print("generating file done!") 
-    '''
+    #'''
     

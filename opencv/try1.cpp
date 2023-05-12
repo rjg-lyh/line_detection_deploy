@@ -15,19 +15,33 @@ void test1(){
   cout << "是否成功打开： " << capture.isOpened() << endl;
 
 
-  // Size S = Size((int)capture.get(CAP_PROP_FRAME_WIDTH),
-	// 	(int)capture.get(CAP_PROP_FRAME_HEIGHT));
-	// int fps = capture.get(CAP_PROP_FPS);
-	// printf("current fps : %d \n", fps);
-	//VideoWriter writer("C:/Users/Dell/Desktop/picture/test.mp4", CAP_OPENCV_MJPEG, fps, S, true);
+  Size S = Size((int)capture.get(CAP_PROP_FRAME_WIDTH),
+		(int)capture.get(CAP_PROP_FRAME_HEIGHT));
+	int fps = capture.get(CAP_PROP_FPS);
+	printf("current fps : %d \n", fps);
+	VideoWriter writer("/home/nvidia/frame_save/test2.avi", CAP_ANY, fps, S, true);
 
-  while(1){
-    Mat frame;
-    capture>>frame;
-    resize(frame, frame, Size(1422, 800));
-    imshow("摄像头采样画面", frame);
-    waitKey(1);
-  }
+  Mat frame;
+	namedWindow("camera-demo", 0);
+  resizeWindow("camera-demo", 1422, 800); 
+	while (capture.read(frame)) {
+		imshow("camera-demo", frame);
+		writer.write(frame);
+		char c = waitKey(50);
+		if (c == 27) {
+			break;
+		}
+	}
+	capture.release();
+	writer.release();
+
+  // while(1){
+  //   Mat frame;
+  //   capture>>frame;
+  //   resize(frame, frame, Size(1422, 800));
+  //   imshow("摄像头采样画面", frame);
+  //   waitKey(1);
+  // }
 
 }
 

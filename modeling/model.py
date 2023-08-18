@@ -134,8 +134,6 @@ class U_Net_Plus_sim(nn.Module):
         out1 = self.out1(feature1)
         return out1, x2, d2
 
-
-
 class AttU_Net(nn.Module):
     """
     Attention Unet implementation

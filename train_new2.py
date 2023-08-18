@@ -31,11 +31,21 @@ def get_argparser():
                         help='the note of the train experiment')
     
     #Experiment number
-    parser.add_argument('--expnum',  type=int, default=10,
+    parser.add_argument('--expnum',  type=int, default=1,
                         help='the number of my train')
+    parser.add_argument("--batch_size", type=int, default=3,
+                        help='batch size (default: 6)')
+    parser.add_argument("--weight_decay", type=float, default=1e-4,
+                        help='weight decay (default: 1e-4)')
+    parser.add_argument('--init_lr', type=float, default=0.02,
+                        help='init learning rate')
+    parser.add_argument("--random_seed", type=int, default=1,
+                        help="random seed (default: 1)")
 
     #Dataset Options
-    parser.add_argument('--data_root', type=str, default='/home/rjg/dataset2',
+    # parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/dataset_SunAndShadow',
+    #                     help='path to Dataset')
+    parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/dataset2',
                         help='path to Dataset')
     parser.add_argument('--dataset', type=str, default='crop_line',
                         help='Name of Dataset')
@@ -52,27 +62,20 @@ def get_argparser():
     #Train Options
     parser.add_argument("--ckpt", default=None, type=str,
                         help="restore from checkpoint")
-    parser.add_argument("--save_val_results", action='store_false', default=True,
+    parser.add_argument("--save_val_results", action='store_true', default=False,
                         help="save segmentation results to \"./results\"")
-    parser.add_argument('--num_workers', type=int, default=0,
+    parser.add_argument('--num_workers', type=int, default=15,
                         help='number of CPU workers, cat /proc/cpuinfo 查看cpu核心数')
     parser.add_argument('--epoch_num', type=int, default=6,
                         help='epoch number')
     parser.add_argument('--optimizer', type=str, default='SGD', choices=['SGD', 'Adam'],
                         help='the type of optimizer')
-    parser.add_argument('--init_lr', type=float, default=1e-3,
-                        help='init learning rate')
+    
     parser.add_argument('--lr_policy', type=str, default='step', choices=['step', 'poly'],
                         help='learning rate scheduler policy')
-    parser.add_argument("--weight_decay", type=float, default=1e-4,
-                        help='weight decay (default: 1e-4)')
     parser.add_argument('--step_size', type=int, default=2,
                         help='when to change LR')
-    parser.add_argument("--batch_size", type=int, default=4,
-                        help='batch size (default: 6)')
     parser.add_argument("--crop_size", type=int, default=256)
-    parser.add_argument("--random_seed", type=int, default=1,
-                        help="random seed (default: 1)")
     parser.add_argument("--print_interval", type=int, default=1,
                         help="tmp print interval of loss (default: 1)")
     parser.add_argument("--val_interval", type=int, default=1,
@@ -83,7 +86,7 @@ def get_argparser():
                         help="need focal loss")
     
     # Visdom options
-    parser.add_argument("--enable_vis", action='store_false', default=True,
+    parser.add_argument("--enable_vis", action='store_true', default=False,
                         help="use visdom for visualization")
     parser.add_argument("--vis_port", type=str, default='8097',
                         help='port for visdom')
@@ -275,7 +278,7 @@ def main():
     train_loader = DataLoader(
         train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
     val_loader = DataLoader(
-        val_dst, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
+        val_dst, batch_size=1, shuffle=True, num_workers=opts.num_workers)
     print("Dataset: %s, Train set: %d, Val set: %d" %
           (opts.dataset, len(train_dst), len(val_dst)))
     

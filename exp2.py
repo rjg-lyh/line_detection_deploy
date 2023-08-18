@@ -27,26 +27,38 @@ def get_argparser():
     parser = argparse.ArgumentParser()
 
     #Experiment Note
-    parser.add_argument('--note',  type=str, default='all_rows, main_rows, left_main, right_main, navigation_line Detector',
+    parser.add_argument('--note',  type=str, default='all_rows, left_main, right_main, navigation_line Detector',
                         help='the note of the train experiment')
     
     #Experiment number
-    parser.add_argument('--expnum',  type=int, default=2,
+    parser.add_argument('--expnum',  type=int, default=10,
                         help='the number of my train')
+    parser.add_argument("--batch_size", type=int, default=3,
+                        help='batch size (default: 6)')
+    parser.add_argument("--weight_decay", type=float, default=1e-4,
+                        help='weight decay (default: 1e-4)')
+    parser.add_argument('--init_lr', type=float, default=0.02,
+                        help='init learning rate')
+    parser.add_argument('--epoch_num', type=int, default=8,
+                        help='epoch number')
+    parser.add_argument("--random_seed", type=int, default=2,
+                        help="random seed (default: 1)")
 
     #Dataset Options
+    # parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/dataset_SunAndShadow',
+    #                     help='path to Dataset')
     parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/dataset2',
                         help='path to Dataset')
     parser.add_argument('--dataset', type=str, default='crop_line',
                         help='Name of Dataset')
 
     #Model Options
-    parser.add_argument('--model', type=str, default='AttU_Net',
+    parser.add_argument('--model', type=str, default='UNet',
                         choices=['UNet', 'DGLNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],
                         help='model name')
     parser.add_argument('--input_channel', type=int, default=3,
                         help='the channel of the input image')                  
-    parser.add_argument('--num_classes', type=int, default=5,
+    parser.add_argument('--num_classes', type=int, default=4,
                         help='num classes in seg_task')
 
     #Train Options
@@ -56,23 +68,14 @@ def get_argparser():
                         help="save segmentation results to \"./results\"")
     parser.add_argument('--num_workers', type=int, default=15,
                         help='number of CPU workers, cat /proc/cpuinfo 查看cpu核心数')
-    parser.add_argument('--epoch_num', type=int, default=6,
-                        help='epoch number')
     parser.add_argument('--optimizer', type=str, default='SGD', choices=['SGD', 'Adam'],
                         help='the type of optimizer')
-    parser.add_argument('--init_lr', type=float, default=1e-3,
-                        help='init learning rate')
+    
     parser.add_argument('--lr_policy', type=str, default='step', choices=['step', 'poly'],
                         help='learning rate scheduler policy')
-    parser.add_argument("--weight_decay", type=float, default=1e-4,
-                        help='weight decay (default: 1e-4)')
     parser.add_argument('--step_size', type=int, default=2,
                         help='when to change LR')
-    parser.add_argument("--batch_size", type=int, default=4,
-                        help='batch size (default: 6)')
     parser.add_argument("--crop_size", type=int, default=256)
-    parser.add_argument("--random_seed", type=int, default=1,
-                        help="random seed (default: 1)")
     parser.add_argument("--print_interval", type=int, default=1,
                         help="tmp print interval of loss (default: 1)")
     parser.add_argument("--val_interval", type=int, default=1,
@@ -99,7 +102,7 @@ def get_dataset(opts):
     """
     train_transform = et.ExtCompose([
             #et.ExtRandomHorizontalFlip(),
-            et.ExtRandomRotation((-8.0, 8.0)),
+            # et.ExtRandomRotation((-8.0, 8.0)),
             et.ExtResize(size=[opts.crop_size, opts.crop_size]),
             #et.ExtRandomScale((0.5, 2.0)),
             #et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size), pad_if_needed=True),
@@ -143,7 +146,6 @@ def save_best_img(opts, model, loader, device):
     denorm = utils.Denormalize(mean=[0.5, 0.5, 0.5], 
                                 std=[0.5, 0.5, 0.5])
     img_id = 0
-    model.eval()
     with torch.no_grad():
         for j, (images, labels) in tqdm(enumerate(loader)):
             images = images.to(device, dtype=torch.float32)
@@ -155,15 +157,13 @@ def save_best_img(opts, model, loader, device):
             out_sigm2 = preds[:, 1].detach().sigmoid()
             out_sigm3 = preds[:, 2].detach().sigmoid()
             out_sigm4 = preds[:, 3].detach().sigmoid()
-            out_sigm5 = preds[:, 4].detach().sigmoid()
             roi = torch.ones_like(out_sigm1, dtype=torch.uint8)
             ng = torch.zeros_like(out_sigm1, dtype=torch.uint8)
             mask1 = torch.where(out_sigm1>0.5, roi, ng).cpu().numpy()
             mask2 = torch.where(out_sigm2>0.5, roi, ng).cpu().numpy()
             mask3 = torch.where(out_sigm3>0.5, roi, ng).cpu().numpy()
             mask4 = torch.where(out_sigm4>0.5, roi, ng).cpu().numpy()
-            mask5 = torch.where(out_sigm5>0.5, roi, ng).cpu().numpy()
-            tgt1, tgt2, tgt3, tgt4, tgt5 = lbl3.detach().squeeze(1).cpu().numpy(), lbl5.detach().squeeze(1).cpu().numpy(), lbl1.detach().squeeze(1).cpu().numpy(), lbl2.detach().squeeze(1).cpu().numpy(), lbl4.detach().squeeze(1).cpu().numpy()#(2 256 256), (2 256 256)
+            tgt1, tgt2, tgt3, tgt4 = lbl3.detach().squeeze(1).cpu().numpy(), lbl1.detach().squeeze(1).cpu().numpy(), lbl2.detach().squeeze(1).cpu().numpy(), lbl4.detach().squeeze(1).cpu().numpy()#(2 256 256), (2 256 256)
 
             for i in range(len(images)):
                 image = images[i].detach().cpu().numpy()
@@ -175,8 +175,6 @@ def save_best_img(opts, model, loader, device):
                 pred3 = mask3[i]
                 target4 = tgt4[i]
                 pred4 = mask4[i]
-                target5 = tgt5[i]
-                pred5 = mask5[i]
 
                 image = (denorm(image) * 255).transpose(1, 2, 0).astype(np.uint8)
                 target1 = loader.dataset.decode_target(target1).astype(np.uint8)#将掩码转化为了RGB图像
@@ -187,18 +185,16 @@ def save_best_img(opts, model, loader, device):
                 pred3 = loader.dataset.decode_target(pred3*3).astype(np.uint8)
                 target4 = loader.dataset.decode_target(target4*4).astype(np.uint8)
                 pred4 = loader.dataset.decode_target(pred4*4).astype(np.uint8)
-                target5 = loader.dataset.decode_target(target5*5).astype(np.uint8)
-                pred5 = loader.dataset.decode_target(pred5*5).astype(np.uint8)
 
                 Image.fromarray(image).save('../record/checkpoints_%d/results/%d_image.png' % (opts.expnum, img_id))#保存为.png格式的图像
+                Image.fromarray(target1).save('../record/checkpoints_%d/results/%d_target1.png' % (opts.expnum, img_id))
+                Image.fromarray(pred1).save('../record/checkpoints_%d/results/%d_pred1.png' % (opts.expnum, img_id))
                 Image.fromarray(target2).save('../record/checkpoints_%d/results/%d_target2.png' % (opts.expnum, img_id))
                 Image.fromarray(pred2).save('../record/checkpoints_%d/results/%d_pred2.png' % (opts.expnum, img_id))
                 Image.fromarray(target3).save('../record/checkpoints_%d/results/%d_target3.png' % (opts.expnum, img_id))
                 Image.fromarray(pred3).save('../record/checkpoints_%d/results/%d_pred3.png' % (opts.expnum, img_id))
                 Image.fromarray(target4).save('../record/checkpoints_%d/results/%d_target4.png' % (opts.expnum, img_id))
                 Image.fromarray(pred4).save('../record/checkpoints_%d/results/%d_pred4.png' % (opts.expnum, img_id))
-                Image.fromarray(target5).save('../record/checkpoints_%d/results/%d_target5.png' % (opts.expnum, img_id))
-                Image.fromarray(pred5).save('../record/checkpoints_%d/results/%d_pred5.png' % (opts.expnum, img_id))
 
                 fig = plt.figure()
                 plt.imshow(image)
@@ -206,7 +202,6 @@ def save_best_img(opts, model, loader, device):
                 plt.imshow(pred2, alpha=0.6)
                 plt.imshow(pred3, alpha=0.6)
                 plt.imshow(pred4, alpha=0.6)
-                plt.imshow(pred5, alpha=0.7)
                 ax = plt.gca()
                 ax.xaxis.set_major_locator(matplotlib.ticker.NullLocator())
                 ax.yaxis.set_major_locator(matplotlib.ticker.NullLocator())
@@ -216,9 +211,8 @@ def save_best_img(opts, model, loader, device):
     print('best val_pictures are saved successfully! !')
 
 def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
-    metrics_1, metrics_2, metrics_3, metrics_4, metrics_5= metrics
+    metrics_1,metrics_3,metrics_4,metrics_5 = metrics
     metrics_1.reset()
-    metrics_2.reset()
     metrics_3.reset()
     metrics_4.reset()
     metrics_5.reset()
@@ -230,35 +224,32 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
         for i, (images, labels) in tqdm(enumerate(loader)):
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
-            preds = model(images)#[2 5 256 256]
+            preds = model(images)#[2 2 256 256]
             lbl1, lbl2, lbl3, lbl4, lbl5 = convert_label(labels)#(2 1 256 256) ,(2 1 256 256), ...
-            # lbl3 lbl5 lbl1 lbl2 lbl4对应metrics_1, 2, 3, 4, 5     
+                
             out_sigm1 = preds[:,0].detach().sigmoid()#(2 256 256)
             out_sigm2 = preds[:,1].detach().sigmoid()#(2 256 256)
             out_sigm3 = preds[:,2].detach().sigmoid()#(2 256 256)
             out_sigm4 = preds[:,3].detach().sigmoid()#(2 256 256)
-            out_sigm5 = preds[:,4].detach().sigmoid()#(2 256 256)
             roi = torch.ones_like(out_sigm1, dtype=torch.uint8)
             ng = torch.zeros_like(out_sigm1, dtype=torch.uint8)
             mask1 = torch.where(out_sigm1>0.5, roi, ng).cpu().numpy()
             mask2 = torch.where(out_sigm2>0.5, roi, ng).cpu().numpy()
             mask3 = torch.where(out_sigm3>0.5, roi, ng).cpu().numpy()
             mask4 = torch.where(out_sigm4>0.5, roi, ng).cpu().numpy()
-            mask5 = torch.where(out_sigm5>0.5, roi, ng).cpu().numpy()
-            tgt1, tgt2, tgt3, tgt4, tgt5 = lbl3.detach().squeeze(1).cpu().numpy(), lbl5.detach().squeeze(1).cpu().numpy(), lbl1.detach().squeeze(1).cpu().numpy(), lbl2.detach().squeeze(1).cpu().numpy(), lbl4.detach().squeeze(1).cpu().numpy()#(2 256 256), (2 256 256)
+            tgt1, tgt2, tgt3, tgt4 = lbl3.detach().squeeze(1).cpu().numpy(), lbl1.detach().squeeze(1).cpu().numpy(), lbl2.detach().squeeze(1).cpu().numpy(), lbl4.detach().squeeze(1).cpu().numpy()#(2 256 256), (2 256 256)
 
             metrics_1.update(tgt1, mask1)
-            metrics_2.update(tgt2, mask2)
-            metrics_3.update(tgt3, mask3)
-            metrics_4.update(tgt4, mask4)
-            metrics_5.update(tgt5, mask5)
+            metrics_3.update(tgt2, mask2)
+            metrics_4.update(tgt3, mask3)
+            metrics_5.update(tgt4, mask4)
 
             if ret_samples_ids is not None and i in ret_samples_ids:  # get vis samples
                 ret_samples.append(
-                    (images[0].detach().cpu().numpy(), tgt2[0], mask2[0], tgt3[0], mask4[0], tgt4[0], mask4[0], mask5[0], tgt5[0]))
+                    (images[0].detach().cpu().numpy(), tgt2[0], mask2[0], tgt3[0], mask3[0], tgt4[0], mask4[0]))
 
-        score1, score2, score3, score4, score5 = metrics_1.get_results(), metrics_2.get_results(), metrics_3.get_results(), metrics_4.get_results(), metrics_5.get_results()
-    return (score1, score2, score3, score4, score5), ret_samples
+        score1, score2, score3, score4 = metrics_1.get_results(), metrics_3.get_results(), metrics_4.get_results(), metrics_5.get_results()
+    return (score1, score2, score3, score4), ret_samples
 
 def main():
 
@@ -278,14 +269,16 @@ def main():
     print("Device: %s" % device)
     
     # Setup random seed
-    utils.seed_everything(opts.random_seed)
+    torch.manual_seed(opts.random_seed)
+    np.random.seed(opts.random_seed)
+    random.seed(opts.random_seed)
 
     #Setup dataloader
     train_dst, val_dst = get_dataset(opts)
     train_loader = DataLoader(
         train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
     val_loader = DataLoader(
-        val_dst, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
+        val_dst, batch_size=1, shuffle=True, num_workers=opts.num_workers)
     print("Dataset: %s, Train set: %d, Val set: %d" %
           (opts.dataset, len(train_dst), len(val_dst)))
     
@@ -303,11 +296,11 @@ def main():
     model = model_map[opts.model](opts)
 
     # Setup metrics
-    metrics_1 = StreamSegMetrics(opts.num_classes - 3) #all_rows
-    metrics_2 = StreamSegMetrics(opts.num_classes - 3) #main_rows(not split)
-    metrics_3 = StreamSegMetrics(opts.num_classes - 3) #left_main
-    metrics_4 = StreamSegMetrics(opts.num_classes - 3) #right_main
-    metrics_5 = StreamSegMetrics(opts.num_classes - 3) #navigation_line
+    metrics_1 = StreamSegMetrics(opts.num_classes - 2) #all_rows
+    metrics_2 = StreamSegMetrics(opts.num_classes - 2) #main_rows(not split)
+    metrics_3 = StreamSegMetrics(opts.num_classes - 2) #left_main
+    metrics_4 = StreamSegMetrics(opts.num_classes - 2) #right_main
+    metrics_5 = StreamSegMetrics(opts.num_classes - 2) #navigation_line
 
 
     # Set up optimizer
@@ -394,7 +387,7 @@ def main():
             optimizer.zero_grad()
             outputs = model(images) #contain one or two heatmaps
             lbl1, lbl2, lbl3, lbl4, lbl5 = convert_label(labels)
-            lbls = torch.concat([lbl3, lbl5, lbl1, lbl2, lbl4], 1) #all_rows, main_rows, left_main, right_main, navigation
+            lbls = torch.concat([lbl3, lbl1, lbl2, lbl4], 1) #[2 2 256 256]
             loss = criterion(outputs, lbls)
 
             loss.backward()
@@ -421,14 +414,13 @@ def main():
             print("validation...")
             model.eval()
             val_score, ret_samples = validate(
-                    opts=opts, model=model, loader=val_loader, device=device, metrics=(metrics_1,metrics_2,metrics_3,metrics_4,metrics_5), ret_samples_ids=vis_sample_id)
+                    opts=opts, model=model, loader=val_loader, device=device, metrics=(metrics_1,metrics_3,metrics_4,metrics_5), ret_samples_ids=vis_sample_id)
             print('作物行IOU:\n', metrics_1.to_str(val_score[0]))
-            print('主作物行IOU:\n', metrics_2.to_str(val_score[1]))
-            print('主左作物行IOU:\n', metrics_3.to_str(val_score[2]))
-            print('主右作物行IOU:\n', metrics_4.to_str(val_score[3]))
-            print('导航线IOU:\n', metrics_5.to_str(val_score[4]))
-            if val_score[4]['Mean IoU'] > best_score:  # when Nevigation_line best
-                best_score = val_score[4]['Mean IoU']
+            print('主左作物行IOU:\n', metrics_3.to_str(val_score[1]))
+            print('主右作物行IOU:\n', metrics_4.to_str(val_score[2]))
+            print('导航线IOU:\n', metrics_5.to_str(val_score[3]))
+            if val_score[3]['Mean IoU'] > best_score:  # when Nevigation_line best
+                best_score = val_score[3]['Mean IoU']
                 save_ckpt('../record/checkpoints_%d/best_%s.pth' %
                             (opts.expnum, opts.model))
                 best_info = val_score     
@@ -437,7 +429,7 @@ def main():
                     # vis.vis_scalar("[Val] Mean IoU", cur_epoch, val_score['Mean IoU'])
                     # vis.vis_table("[Val] Class IoU", val_score['Class IoU'])
 
-                    for k, (img, tgt2, mask2, tgt3, mask4, tgt4, mask4, mask5, tgt5) in enumerate(ret_samples):
+                    for k, (img, tgt2, mask2, tgt3, mask3, tgt4, mask4) in enumerate(ret_samples):
                         img = (denorm(img) * 255).astype(np.uint8)
                         tgt2 = train_dst.decode_target(tgt2*2).transpose(2, 0, 1).astype(np.uint8)
                         mask2 = train_dst.decode_target(mask2*2).transpose(2, 0, 1).astype(np.uint8)
@@ -445,9 +437,7 @@ def main():
                         mask3 = train_dst.decode_target(mask3*3).transpose(2, 0, 1).astype(np.uint8)
                         tgt4 = train_dst.decode_target(tgt4*4).transpose(2, 0, 1).astype(np.uint8)
                         mask4 = train_dst.decode_target(mask4*4).transpose(2, 0, 1).astype(np.uint8)
-                        tgt5 = train_dst.decode_target(tgt5*5).transpose(2, 0, 1).astype(np.uint8)
-                        mask5 = train_dst.decode_target(mask5*5).transpose(2, 0, 1).astype(np.uint8)
-                        concat_img = np.concatenate((img, tgt2, mask2, tgt3, mask3, tgt4, mask4, tgt5, mask5), axis=2)  # concat along width
+                        concat_img = np.concatenate((img, tgt2, mask2, tgt3, mask3, tgt4, mask4), axis=2)  # concat along width
                         vis.vis_image('Sample %d' % k, concat_img)
             with open(logs_filename, 'a') as f:
                 miou1 = val_score[0]['Mean IoU']
@@ -458,41 +448,37 @@ def main():
                 class_iou3 = val_score[2]['Class IoU']
                 miou4 = val_score[3]['Mean IoU']
                 class_iou4 = val_score[3]['Class IoU']
-                miou5 = val_score[4]['Mean IoU']
-                class_iou5 = val_score[4]['Class IoU']
                 f.writelines('\nValid:\n\n')
                 f.writelines(f'\t作物行   Mean IoU: {miou1} Class IoU: {class_iou1}\n')
-                f.writelines(f'\t主作物行   Mean IoU: {miou2} Class IoU: {class_iou2}\n')
-                f.writelines(f'\t主左作物行   Mean IoU: {miou3} Class IoU: {class_iou3}\n')
-                f.writelines(f'\t主右作物行   Mean IoU: {miou4} Class IoU: {class_iou4}\n')
-                f.writelines(f'\t导航线   Mean IoU: {miou5} Class IoU: {class_iou5}\n')
+                f.writelines(f'\t主左作物行   Mean IoU: {miou2} Class IoU: {class_iou2}\n')
+                f.writelines(f'\t主右作物行   Mean IoU: {miou3} Class IoU: {class_iou3}\n')
+                f.writelines(f'\t导航线   Mean IoU: {miou4} Class IoU: {class_iou4}\n')
         scheduler.step()
-    
-    best_info_pp1 = metrics_1.to_str(best_info[0])
-    best_info_pp2 = metrics_2.to_str(best_info[1])
-    best_info_pp3 = metrics_3.to_str(best_info[2])
-    best_info_pp4 = metrics_4.to_str(best_info[3])
-    best_info_pp5 = metrics_5.to_str(best_info[4])
 
+    best_info_pp1 = metrics_1.to_str(best_info[0])
+    best_info_pp2 = metrics_3.to_str(best_info[1])
+    best_info_pp3 = metrics_4.to_str(best_info[2])
+    best_info_pp4 = metrics_5.to_str(best_info[3])
+    
     #Save val_results
     if opts.save_val_results:
         best_ckpt = '../record/checkpoints_%d/best_%s.pth' % (opts.expnum, opts.model)
         model.load_state_dict(torch.load(best_ckpt)["model_state"])
         save_best_img(opts=opts, model=model, loader=val_loader, device=device)
     
-    device1 = ('cpu')
+    device1 = torch.device('cpu')
     Total_Params = stat(model.to(device1), (opts.input_channel, opts.crop_size, opts.crop_size))
     #Save 'config_info' and 'best_info'
     with open(logs_filename,'a') as f:
-        f.write(f'\n\n{Total_Params}\n\n作物行:\n{best_info_pp1}\n\n主作物行:\n{best_info_pp2}\n\n主左作物行:\n{best_info_pp3}\n\n主右作物行:\n{best_info_pp4}\n\n导航线:\n{best_info_pp5}')
+        f.write(f'\n\n{Total_Params}\n\n作物行:\n{best_info_pp1}\n\n主左作物行:\n{best_info_pp2}\n\n主右作物行:\n{best_info_pp3}\n\n导航线:\n{best_info_pp4}')
     #Print total params
     print(Total_Params)
     print('finish all epochs, best_metrics is shown below:')
     print('作物行_best_iou:\n', best_info_pp1)
-    print('主作物行_best_iou:\n', best_info_pp2)
-    print('主左作物行_best_iou:\n', best_info_pp3)
-    print('主右作物行_best_iou:\n', best_info_pp4)
-    print('导航线_best_iou:\n', best_info_pp5)
+    print('主左作物行_best_iou:\n', best_info_pp2)
+    print('主右作物行_best_iou:\n', best_info_pp3)
+    print('导航线_best_iou:\n', best_info_pp4)
+
 
 
 if __name__=='__main__':

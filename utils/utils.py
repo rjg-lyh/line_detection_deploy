@@ -1,4 +1,6 @@
 from torchvision.transforms.functional import normalize
+import torch
+import random
 import torch.nn as nn
 import numpy as np
 import os 
@@ -45,4 +47,13 @@ def compute_eta(start_time, end_time, leave_itrs):
     minute, eta = eta//60, eta%60
     second = eta
 
-    return day, hour, minute, second 
+    return day, hour, minute, second
+
+def seed_everything(seed):
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available(): 
+        torch.cuda.manual_seed(seed)
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True

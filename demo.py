@@ -132,12 +132,32 @@ def watch_thin(image, mask2, mask3, mask4):
 
 def line_fitness(dots, image, type = cv2.DIST_L1, color=(255, 0, 0)):
     image_ = image.copy()
-    w = image_.shape[0]
-    [vx, vy, x, y] = cv2.fitLine(dots, type, 0, 0.01, 0.01)
-    y1 = int((-x * vy / vx) + y)
-    y2 = int(((w - x) * vy / vx) + y)
-    cv2.line(image_, (w - 1, y2), (0, y1), color, 2)
-    return image_, (w - 1, y2),(0, y1)
+    h, w = image_.shape[0]-1, image_.shape[1]-1
+    [vx, vy, x0, y0] = cv2.fitLine(dots, type, 0, 0.01, 0.01)
+    k = vy/vx
+    list1 = []
+    #左竖交点 (0, ?)
+    x1 = 0
+    y1 = int(k*(x1-x0)+y0)
+    if(0<= y1 <= h): list1.append((x1, y1))
+    #右竖交点 (w, ?)
+    x2 = w
+    y2 = int(k*(w-x0)+y0)
+    if(0 <= y2 <= h): list1.append((x2, y2))
+    
+    #上横交点 (?, 0)
+    if(len(list1) != 2):
+        y3 = 0
+        x3 = int((y3-y0)/k+x0)
+        if(0<= x3 <= w): list1.append((x3, y3))
+    #下横交点 (?, h)
+    if(len(list1) != 2):
+        y4 = h
+        x4 = int((y4-y0)/k+x0)
+        if(0<= x4 <= w): list1.append((x4, y4))
+    
+    cv2.line(image_, list1[0], list1[1], color, 2)
+    return image_, list1[0], list1[1]
 
 if __name__ == '__main__':
     opts = get_argparser().parse_args()

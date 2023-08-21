@@ -30,11 +30,18 @@ def get_argparser():
     parser.add_argument('--note',  type=str, default='Test Code: all_rows, left_main, right_main, navigation_line Detector',
                         help='the note of the train experiment')
     
-    parser.add_argument('--expnum',  type=int, default=1,
+    parser.add_argument('--expnum',  type=int, default=7,
                         help='the number of my train')
-    parser.add_argument("--ckpt", default='/root/project/record/checkpoints_1/best_AttU_Net.pth', type=str,
+    parser.add_argument("--ckpt", default='/root/project/record/checkpoints_4/best_DGLNet_noxuan.pth', type=str,
                         help="restore from checkpoint")
-    parser.add_argument("--save_val_results", action='store_false', default=True,
+    parser.add_argument('--model', type=str, default='DGLNet',
+                        choices=['UNet', 'DGLNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],
+                        help='model name')
+    parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/test_dataset',
+                        help='path to Dataset')
+    # parser.add_argument("--save_val_results", action='store_false', default=True,
+    #                     help="save segmentation results to \"./results\"")
+    parser.add_argument("--save_val_results", action='store_true', default=False,
                         help="save segmentation results to \"./results\"")
     
     
@@ -54,15 +61,10 @@ def get_argparser():
     #Dataset Options
     # parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/dataset_SunAndShadow',
     #                     help='path to Dataset')
-    parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/test_dataset',
-                        help='path to Dataset')
     parser.add_argument('--dataset', type=str, default='crop_line',
                         help='Name of Dataset')
 
     #Model Options
-    parser.add_argument('--model', type=str, default='AttU_Net',
-                        choices=['UNet', 'DGLNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],
-                        help='model name')
     parser.add_argument('--input_channel', type=int, default=3,
                         help='the channel of the input image')                  
     parser.add_argument('--num_classes', type=int, default=4,

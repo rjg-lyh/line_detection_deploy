@@ -27,7 +27,7 @@ def get_argparser():
     parser = argparse.ArgumentParser()
 
     #Experiment Note
-    parser.add_argument('--note',  type=str, default='all_rows, left_main, right_main, navigation_line Detector',
+    parser.add_argument('--note',  type=str, default='DGLNet Detector',
                         help='the note of the train experiment')
     
     #Experiment number
@@ -37,7 +37,7 @@ def get_argparser():
                         help='batch size (default: 6)')
     parser.add_argument("--weight_decay", type=float, default=1e-4,
                         help='weight decay (default: 1e-4)')
-    parser.add_argument('--init_lr', type=float, default=0.02,
+    parser.add_argument('--init_lr', type=float, default=0.025,
                         help='init learning rate')
     parser.add_argument('--epoch_num', type=int, default=8,
                         help='epoch number')
@@ -53,7 +53,7 @@ def get_argparser():
                         help='Name of Dataset')
 
     #Model Options
-    parser.add_argument('--model', type=str, default='AttU_Net',
+    parser.add_argument('--model', type=str, default='DGLNet',
                         choices=['UNet', 'DGLNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],
                         help='model name')
     parser.add_argument('--input_channel', type=int, default=3,
@@ -102,7 +102,7 @@ def get_dataset(opts):
     """
     train_transform = et.ExtCompose([
             #et.ExtRandomHorizontalFlip(),
-            # et.ExtRandomRotation((-8.0, 8.0)),
+            et.ExtRandomRotation((-8.0, 8.0)),
             et.ExtResize(size=[opts.crop_size, opts.crop_size]),
             #et.ExtRandomScale((0.5, 2.0)),
             #et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size), pad_if_needed=True),
@@ -113,6 +113,7 @@ def get_dataset(opts):
             ])
 
     val_transform = et.ExtCompose([
+                et.ExtRandomRotation((-8.0, 8.0)),
                 et.ExtResize(size=[opts.crop_size, opts.crop_size]),
                 #et.ExtCenterCrop(opts.crop_size),
                 et.ExtToTensor(),
@@ -296,11 +297,11 @@ def main():
     model = model_map[opts.model](opts)
 
     # Setup metrics
-    metrics_1 = StreamSegMetrics(opts.num_classes - 2) #all_rows
-    metrics_2 = StreamSegMetrics(opts.num_classes - 2) #main_rows(not split)
-    metrics_3 = StreamSegMetrics(opts.num_classes - 2) #left_main
-    metrics_4 = StreamSegMetrics(opts.num_classes - 2) #right_main
-    metrics_5 = StreamSegMetrics(opts.num_classes - 2) #navigation_line
+    metrics_1 = StreamSegMetrics(2) #all_rows
+    metrics_2 = StreamSegMetrics(2) #main_rows(not split)
+    metrics_3 = StreamSegMetrics(2) #left_main
+    metrics_4 = StreamSegMetrics(2) #right_main
+    metrics_5 = StreamSegMetrics(2) #navigation_line
 
 
     # Set up optimizer
@@ -387,14 +388,14 @@ def main():
             optimizer.zero_grad()
             outputs = model(images) #contain one or two heatmaps
             lbl1, lbl2, lbl3, lbl4, lbl5 = convert_label(labels)
-            lbls = torch.concat([lbl3, lbl1, lbl2, lbl4], 1) #[2 4 256 256]
-            loss = criterion(outputs, lbls)
+            # lbls = torch.concat([lbl3, lbl1, lbl2, lbl4], 1) #[2 4 256 256]
+            # loss = criterion(outputs, lbls)
             
-            # loss1 = criterion(outputs[:,0].unsqueeze(1), lbl3)
-            # loss2 = criterion(outputs[:,1].unsqueeze(1), lbl1)
-            # loss3 = criterion(outputs[:,2].unsqueeze(1), lbl2)
-            # loss4 = criterion(outputs[:,3].unsqueeze(1), lbl4)
-            # loss = 0.1*loss1 + 0.1*loss2 + 0.1*loss3 + 0.7*loss4
+            loss1 = criterion(outputs[:,0].unsqueeze(1), lbl3)
+            loss2 = criterion(outputs[:,1].unsqueeze(1), lbl1)
+            loss3 = criterion(outputs[:,2].unsqueeze(1), lbl2)
+            loss4 = criterion(outputs[:,3].unsqueeze(1), lbl4)
+            loss = 0.1*loss1 + 0.1*loss2 + 0.1*loss3 + 0.7*loss4
 
             loss.backward()
             optimizer.step()

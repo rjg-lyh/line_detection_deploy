@@ -247,6 +247,137 @@ class RRCNN_block(nn.Module):
         out = x1 + x2
         return out
 
+class SELayer_2d(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer_2d, self).__init__()
+        self.avg_pool = torch.nn.AdaptiveAvgPool2d(1)
+        self.linear1 = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True)
+        )
+        self.linear2 = nn.Sequential(
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
+
+
+    def forward(self, X_input):
+        b, c, _, _ = X_input.size()  	# shape = [32, 64, 2000, 80]
+        
+        y = self.avg_pool(X_input)		# shape = [32, 64, 1, 1]
+        y = y.view(b, c)				# shape = [32,64]
+        
+        # 第1个线性层（含激活函数），即公式中的W1，其维度是[channel, channer/16], 其中16是默认的
+        y = self.linear1(y)				# shape = [32, 64] * [64, 4] = [32, 4]
+        
+        # 第2个线性层（含激活函数），即公式中的W2，其维度是[channel/16, channer], 其中16是默认的
+        y = self.linear2(y) 			# shape = [32, 4] * [4, 64] = [32, 64]
+        y = y.view(b, c, 1, 1)			# shape = [32, 64, 1, 1]， 这个就表示上面公式的s, 即每个通道的权重
+
+        return X_input*y.expand_as(X_input)
+
+# 一堆操作
+class DGLNet_Head(nn.Module):
+    def __init__(self, in_channels):
+        super(DGLNet_Head, self).__init__()
+        
+        # self.SE = SELayer_2d()
+        
+        self.aux1 = nn.Conv2d(in_channels, 1, kernel_size=1, stride=1, padding=0)
+        self.aux2 = nn.Conv2d(in_channels//2, 1, kernel_size=1, stride=1, padding=0)
+        self.aux3 = nn.Conv2d(in_channels//2, 1, kernel_size=1, stride=1, padding=0)
+        
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels//2, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm2d(in_channels//2),
+            nn.ReLU(inplace=True)
+        )
+        
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels//2, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm2d(in_channels//2),
+            nn.ReLU(inplace=True)
+        )
+       
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3,stride=1,padding=1,bias=True),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, 1, kernel_size=1,stride=1,padding=0)
+        )
+
+    def forward(self, x):
+        out1 = self.aux1(x)
+        
+        x1 = self.conv1(x)
+        x2 = self.conv2(x)
+        out2 = self.aux2(x1)
+        out3 = self.aux3(x2)
+        
+        x3 = torch.cat((x1, x2), dim=1)
+        out4 = self.conv3(x3)
+        
+        out =  torch.cat((out1, out2, out3, out4),dim=1)
+        return out
+    
+#四解耦头
+class DGLNet_Head2(nn.Module):
+    def __init__(self, in_channels):
+        super(DGLNet_Head2, self).__init__()
+
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, 1, kernel_size=1, stride=1, padding=0)
+        )
+        
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, 1, kernel_size=1, stride=1, padding=0)
+        )
+        
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, 1, kernel_size=1, stride=1, padding=0)
+        )
+                
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, 1, kernel_size=1, stride=1, padding=0)
+        )
+
+    def forward(self, x):
+        out1 = self.conv1(x)
+        out2 = self.conv2(x)
+        out3 = self.conv3(x)
+        out4 = self.conv4(x)
+        
+        out =  torch.cat((out1, out2, out3, out4),dim=1)
+        return out
+   
+#三解耦头
+class DGLNet_Head3(nn.Module):
+    def __init__(self, in_channels):
+        super(DGLNet_Head3, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels, 3, kernel_size=1, stride=1, padding=0)
+        
+        self.conv2 = nn.Conv2d(3, 1, kernel_size=1, stride=1, padding=0)
+
+    def forward(self, x):
+        out1 = self.conv1(x)
+        out2 = self.conv2(out1)
+        
+        out =  torch.cat((out1, out2),dim=1)
+        return out   
+      
 class Attention_block(nn.Module):
     """
     Attention Block
@@ -272,7 +403,7 @@ class Attention_block(nn.Module):
         )
 
         self.relu = nn.ReLU(inplace=True)
-
+    #forward(d5, e4)
     def forward(self, g, x):
         g1 = self.W_g(g)
         x1 = self.W_x(x)

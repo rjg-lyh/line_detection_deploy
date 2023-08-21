@@ -31,7 +31,7 @@ def get_argparser():
                         help='the note of the train experiment')
     
     #Experiment number
-    parser.add_argument('--expnum',  type=int, default=10,
+    parser.add_argument('--expnum',  type=int, default=3,
                         help='the number of my train')
     parser.add_argument("--batch_size", type=int, default=3,
                         help='batch size (default: 6)')
@@ -41,7 +41,7 @@ def get_argparser():
                         help='init learning rate')
     parser.add_argument('--epoch_num', type=int, default=8,
                         help='epoch number')
-    parser.add_argument("--random_seed", type=int, default=2,
+    parser.add_argument("--random_seed", type=int, default=1,
                         help="random seed (default: 1)")
 
     #Dataset Options
@@ -53,7 +53,7 @@ def get_argparser():
                         help='Name of Dataset')
 
     #Model Options
-    parser.add_argument('--model', type=str, default='UNet',
+    parser.add_argument('--model', type=str, default='AttU_Net',
                         choices=['UNet', 'DGLNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],
                         help='model name')
     parser.add_argument('--input_channel', type=int, default=3,
@@ -102,7 +102,7 @@ def get_dataset(opts):
     """
     train_transform = et.ExtCompose([
             #et.ExtRandomHorizontalFlip(),
-            # et.ExtRandomRotation((-8.0, 8.0)),
+            et.ExtRandomRotation((-8.0, 8.0)),
             et.ExtResize(size=[opts.crop_size, opts.crop_size]),
             #et.ExtRandomScale((0.5, 2.0)),
             #et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size), pad_if_needed=True),
@@ -113,6 +113,7 @@ def get_dataset(opts):
             ])
 
     val_transform = et.ExtCompose([
+                et.ExtRandomRotation((-8.0, 8.0)),
                 et.ExtResize(size=[opts.crop_size, opts.crop_size]),
                 #et.ExtCenterCrop(opts.crop_size),
                 et.ExtToTensor(),
@@ -278,7 +279,7 @@ def main():
     train_loader = DataLoader(
         train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
     val_loader = DataLoader(
-        val_dst, batch_size=1, shuffle=True, num_workers=opts.num_workers)
+        val_dst, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
     print("Dataset: %s, Train set: %d, Val set: %d" %
           (opts.dataset, len(train_dst), len(val_dst)))
     
@@ -387,8 +388,14 @@ def main():
             optimizer.zero_grad()
             outputs = model(images) #contain one or two heatmaps
             lbl1, lbl2, lbl3, lbl4, lbl5 = convert_label(labels)
-            lbls = torch.concat([lbl3, lbl1, lbl2, lbl4], 1) #[2 2 256 256]
+            lbls = torch.concat([lbl3, lbl1, lbl2, lbl4], 1) #[2 4 256 256]
             loss = criterion(outputs, lbls)
+            
+            # loss1 = criterion(outputs[:,0].unsqueeze(1), lbl3)
+            # loss2 = criterion(outputs[:,1].unsqueeze(1), lbl1)
+            # loss3 = criterion(outputs[:,2].unsqueeze(1), lbl2)
+            # loss4 = criterion(outputs[:,3].unsqueeze(1), lbl4)
+            # loss = 0.1*loss1 + 0.1*loss2 + 0.1*loss3 + 0.7*loss4
 
             loss.backward()
             optimizer.step()

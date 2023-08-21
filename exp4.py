@@ -31,7 +31,7 @@ def get_argparser():
                         help='the note of the train experiment')
     
     #Experiment number
-    parser.add_argument('--expnum',  type=int, default=12,
+    parser.add_argument('--expnum',  type=int, default=20,
                         help='the number of my train')
     parser.add_argument("--batch_size", type=int, default=3,
                         help='batch size (default: 6)')
@@ -53,7 +53,7 @@ def get_argparser():
                         help='Name of Dataset')
 
     #Model Options
-    parser.add_argument('--model', type=str, default='UNet',
+    parser.add_argument('--model', type=str, default='AttU_Net',
                         choices=['UNet', 'DGLNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],
                         help='model name')
     parser.add_argument('--input_channel', type=int, default=3,

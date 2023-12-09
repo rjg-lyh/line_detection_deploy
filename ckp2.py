@@ -27,38 +27,37 @@ def get_argparser():
     parser = argparse.ArgumentParser()
 
     #Experiment Note
-    parser.add_argument('--note',  type=str, default='DGLNet Detector',
+    parser.add_argument('--note',  type=str, default='all_rows, left_main, right_main, navigation_line Detector',
                         help='the note of the train experiment')
     
     #Experiment number
-    parser.add_argument('--expnum',  type=int, default=3,
+    parser.add_argument('--expnum',  type=int, default=7,
                         help='the number of my train')
     parser.add_argument("--batch_size", type=int, default=3,
                         help='batch size (default: 6)')
     parser.add_argument("--weight_decay", type=float, default=1e-4,
                         help='weight decay (default: 1e-4)')
-    parser.add_argument('--init_lr', type=float, default=0.025,
+    parser.add_argument('--init_lr', type=float, default=0.02,
                         help='init learning rate')
     parser.add_argument('--epoch_num', type=int, default=8,
                         help='epoch number')
     parser.add_argument("--random_seed", type=int, default=1,
                         help="random seed (default: 1)")
-    parser.add_argument('--need_test', type=bool, default=True,
+    parser.add_argument('--need_test', type=bool, default=False,
                         help='test model performance or not')
     parser.add_argument('--test_root', type=str, default='/root/autodl-tmp/test_dataset2',
                         help='path to Dataset')
-    
 
     #Dataset Options
     # parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/dataset_SunAndShadow',
     #                     help='path to Dataset')
-    parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/dataset2',
+    parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/dataset_SunAndShadow',
                         help='path to Dataset')
     parser.add_argument('--dataset', type=str, default='crop_line',
                         help='Name of Dataset')
 
     #Model Options
-    parser.add_argument('--model', type=str, default='DGLNet',
+    parser.add_argument('--model', type=str, default='AttU_Net',
                         choices=['UNet', 'DGLNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],
                         help='model name')
     parser.add_argument('--input_channel', type=int, default=3,
@@ -107,7 +106,7 @@ def get_dataset(opts):
     """
     train_transform = et.ExtCompose([
             #et.ExtRandomHorizontalFlip(),
-            et.ExtRandomRotation((-2.0, 2.0)),
+            # et.ExtRandomRotation((-2.0, 2.0)),
             et.ExtResize(size=[opts.crop_size, opts.crop_size]),
             #et.ExtRandomScale((0.5, 2.0)),
             #et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size), pad_if_needed=True),
@@ -118,7 +117,6 @@ def get_dataset(opts):
             ])
 
     val_transform = et.ExtCompose([
-                # et.ExtRandomRotation((-8.0, 8.0)),
                 et.ExtResize(size=[opts.crop_size, opts.crop_size]),
                 #et.ExtCenterCrop(opts.crop_size),
                 et.ExtToTensor(),
@@ -335,7 +333,7 @@ def main():
     train_loader = DataLoader(
         train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
     val_loader = DataLoader(
-        val_dst, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
+        val_dst, batch_size=1, shuffle=True, num_workers=opts.num_workers)
     print("Dataset: %s, Train set: %d, Val set: %d" %
           (opts.dataset, len(train_dst), len(val_dst)))
     
@@ -353,11 +351,11 @@ def main():
     model = model_map[opts.model](opts)
 
     # Setup metrics
-    metrics_1 = StreamSegMetrics(2) #all_rows
-    metrics_2 = StreamSegMetrics(2) #main_rows(not split)
-    metrics_3 = StreamSegMetrics(2) #left_main
-    metrics_4 = StreamSegMetrics(2) #right_main
-    metrics_5 = StreamSegMetrics(2) #navigation_line
+    metrics_1 = StreamSegMetrics(opts.num_classes - 2) #all_rows
+    metrics_2 = StreamSegMetrics(opts.num_classes - 2) #main_rows(not split)
+    metrics_3 = StreamSegMetrics(opts.num_classes - 2) #left_main
+    metrics_4 = StreamSegMetrics(opts.num_classes - 2) #right_main
+    metrics_5 = StreamSegMetrics(opts.num_classes - 2) #navigation_line
 
 
     # Set up optimizer
@@ -444,14 +442,14 @@ def main():
             optimizer.zero_grad()
             outputs = model(images) #contain one or two heatmaps
             lbl1, lbl2, lbl3, lbl4, lbl5 = convert_label(labels)
-            # lbls = torch.concat([lbl3, lbl1, lbl2, lbl4], 1) #[2 4 256 256]
+            # lbls = torch.concat([lbl3, lbl1, lbl2, lbl4], 1) #[2 2 256 256]
             # loss = criterion(outputs, lbls)
             
             loss1 = criterion(outputs[:,0].unsqueeze(1), lbl3)
             loss2 = criterion(outputs[:,1].unsqueeze(1), lbl1)
             loss3 = criterion(outputs[:,2].unsqueeze(1), lbl2)
             loss4 = criterion(outputs[:,3].unsqueeze(1), lbl4)
-            loss = 0.2*loss1 + 0.2*loss2 + 0.2*loss3 + 0.4*loss4
+            loss = 0.25*loss1 + 0.2*loss2 + 0.2*loss3 + 0.35*loss4
 
             loss.backward()
             optimizer.step()
@@ -482,8 +480,8 @@ def main():
             print('导航线IOU:\n', metrics_5.to_str(val_score[3]))
             if val_score[3]['Mean IoU'] > best_score:  # when Nevigation_line best
                 best_score = val_score[3]['Mean IoU']
-                save_ckpt('../record/checkpoints_%d/best_%s.pth' %
-                            (opts.expnum, opts.model))
+                # save_ckpt('../record/checkpoints_%d/best_%s.pth' %
+                #             (opts.expnum, opts.model))
                 best_info = val_score     
                 if vis is not None:  # visualize validation score and samples
                     # vis.vis_scalar("[Val] Overall Acc", cur_epoch, val_score['Overall Acc'])
@@ -526,7 +524,7 @@ def main():
         best_ckpt = '../record/checkpoints_%d/best_%s.pth' % (opts.expnum, opts.model)
         model.load_state_dict(torch.load(best_ckpt)["model_state"])
         save_best_img(opts=opts, model=model, loader=val_loader, device=device)
-    
+
     #test
     pp1 = pp2 = pp3 = pp4 = None
     score1 = score2 = score3 = score4 = None
@@ -547,7 +545,6 @@ def main():
         pp2 = metrics_2.to_str(score2)
         pp3 = metrics_3.to_str(score3)
         pp4 = metrics_4.to_str(score4)
-        
     
     device1 = torch.device('cpu')
     Total_Params = stat(model.to(device1), (opts.input_channel, opts.crop_size, opts.crop_size))
@@ -568,8 +565,8 @@ def main():
         print('test-导航线IOU: %f'%score4['Class IoU'][1])
         with open(logs_filename,'a') as f:
             f.write(f'\n\ntest-作物行:\n{pp1}\n\ntest-主左作物行:\n{pp2}\n\ntest-主右作物行:\n{pp3}\n\ntest-导航线:\n{pp4}')
-        
-        
-        
+
+
+
 if __name__=='__main__':
     main()

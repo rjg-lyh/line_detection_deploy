@@ -376,7 +376,24 @@ class DGLNet_Head3(nn.Module):
         out2 = self.conv2(out1)
         
         out =  torch.cat((out1, out2),dim=1)
-        return out   
+        return out
+
+#三解耦头v2
+class DGLNet_Head4(nn.Module):
+    def __init__(self, in_channels):
+        super(DGLNet_Head4, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels, 3, kernel_size=1, stride=1, padding=0)
+        
+        self.conv2 = nn.Conv2d(in_channels+3, 1, kernel_size=1, stride=1, padding=0)
+
+    def forward(self, x):
+        out1 = self.conv1(x)
+        x = torch.cat((x, out1), dim=1)
+        out2 = self.conv2(x)
+        
+        out =  torch.cat((out1, out2),dim=1)
+        return out
       
 class Attention_block(nn.Module):
     """

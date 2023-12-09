@@ -31,7 +31,7 @@ def get_argparser():
                         help='the note of the train experiment')
     
     #Experiment number
-    parser.add_argument('--expnum',  type=int, default=2,
+    parser.add_argument('--expnum',  type=int, default=1,
                         help='the number of my train')
     parser.add_argument("--batch_size", type=int, default=3,
                         help='batch size (default: 6)')
@@ -43,6 +43,11 @@ def get_argparser():
                         help='epoch number')
     parser.add_argument("--random_seed", type=int, default=1,
                         help="random seed (default: 1)")
+    parser.add_argument('--need_test', type=bool, default=True,
+                        help='test model performance or not')
+    parser.add_argument('--test_root', type=str, default='/root/autodl-tmp/test_dataset2',
+                        help='path to Dataset')
+    
 
     #Dataset Options
     # parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/dataset_SunAndShadow',
@@ -102,7 +107,7 @@ def get_dataset(opts):
     """
     train_transform = et.ExtCompose([
             #et.ExtRandomHorizontalFlip(),
-            et.ExtRandomRotation((-8.0, 8.0)),
+            # et.ExtRandomRotation((-8.0, 8.0)),
             et.ExtResize(size=[opts.crop_size, opts.crop_size]),
             #et.ExtRandomScale((0.5, 2.0)),
             #et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size), pad_if_needed=True),
@@ -113,7 +118,7 @@ def get_dataset(opts):
             ])
 
     val_transform = et.ExtCompose([
-                et.ExtRandomRotation((-8.0, 8.0)),
+                # et.ExtRandomRotation((-8.0, 8.0)),
                 et.ExtResize(size=[opts.crop_size, opts.crop_size]),
                 #et.ExtCenterCrop(opts.crop_size),
                 et.ExtToTensor(),
@@ -130,6 +135,22 @@ def get_dataset(opts):
                           transform=val_transform)    
 
     return train_dst, val_dst                 
+
+def get_test_dataset(opts):
+    """ Dataset And Augmentation
+    """
+
+    test_transform = et.ExtCompose([
+                et.ExtResize(size=[opts.crop_size, opts.crop_size]),
+                #et.ExtCenterCrop(opts.crop_size),
+                et.ExtToTensor(),
+                et.ExtNormalize(mean=[0.5, 0.5, 0.5],
+                                std=[0.5, 0.5, 0.5]),
+                ])
+    test_dst = Crop_line(root=opts.test_root, 
+                          image_set='test',
+                          transform=test_transform) 
+    return test_dst
 
 def convert_label(lbls):
     false_mask = torch.zeros_like(lbls)
@@ -251,6 +272,41 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
 
         score1, score2, score3, score4 = metrics_1.get_results(), metrics_3.get_results(), metrics_4.get_results(), metrics_5.get_results()
     return (score1, score2, score3, score4), ret_samples
+
+def test(model, test_loader, device, metrics):
+    metrics_1,metrics_3,metrics_4,metrics_5 = metrics
+    metrics_1.reset()
+    metrics_3.reset()
+    metrics_4.reset()
+    metrics_5.reset()
+    model.eval()
+    with torch.no_grad():
+
+        for images, labels in tqdm(test_loader):
+            images = images.to(device, dtype=torch.float32)
+            labels = labels.to(device, dtype=torch.long)
+            preds = model(images)#[2 2 256 256]
+            lbl1, lbl2, lbl3, lbl4, lbl5 = convert_label(labels)#(2 1 256 256) ,(2 1 256 256), ...
+                
+            out_sigm1 = preds[:,0].detach().sigmoid()#(2 256 256)
+            out_sigm2 = preds[:,1].detach().sigmoid()#(2 256 256)
+            out_sigm3 = preds[:,2].detach().sigmoid()#(2 256 256)
+            out_sigm4 = preds[:,3].detach().sigmoid()#(2 256 256)
+            roi = torch.ones_like(out_sigm1, dtype=torch.uint8)
+            ng = torch.zeros_like(out_sigm1, dtype=torch.uint8)
+            mask1 = torch.where(out_sigm1>0.5, roi, ng).cpu().numpy()
+            mask2 = torch.where(out_sigm2>0.5, roi, ng).cpu().numpy()
+            mask3 = torch.where(out_sigm3>0.5, roi, ng).cpu().numpy()
+            mask4 = torch.where(out_sigm4>0.5, roi, ng).cpu().numpy()
+            tgt1, tgt2, tgt3, tgt4 = lbl3.detach().squeeze(1).cpu().numpy(), lbl1.detach().squeeze(1).cpu().numpy(), lbl2.detach().squeeze(1).cpu().numpy(), lbl4.detach().squeeze(1).cpu().numpy()#(2 256 256), (2 256 256)
+
+            metrics_1.update(tgt1, mask1)
+            metrics_3.update(tgt2, mask2)
+            metrics_4.update(tgt3, mask3)
+            metrics_5.update(tgt4, mask4)
+            
+    score1, score2, score3, score4 = metrics_1.get_results(), metrics_3.get_results(), metrics_4.get_results(), metrics_5.get_results()
+    return score1, score2, score3, score4
 
 def main():
 
@@ -416,8 +472,6 @@ def main():
                 interval_loss = []
 
         if (cur_epoch) % opts.val_interval == 0:
-            # save_ckpt('../record/checkpoints_%d/latest_%s.pth' %
-            #     (opts.expnum, opts.model))
             print("validation...")
             model.eval()
             val_score, ret_samples = validate(
@@ -473,6 +527,28 @@ def main():
         model.load_state_dict(torch.load(best_ckpt)["model_state"])
         save_best_img(opts=opts, model=model, loader=val_loader, device=device)
     
+    #test
+    pp1 = pp2 = pp3 = pp4 = None
+    score1 = score2 = score3 = score4 = None
+    if opts.need_test:
+        print("train finish, start test...")
+        #Setup dataloader
+        test_dst = get_test_dataset(opts)
+        test_loader = DataLoader(
+                      test_dst, batch_size=opts.batch_size, shuffle=False)
+        print("test_Dataset: %s, test set: %d" %
+            (opts.dataset, len(test_dst)))
+        
+        best_ckpt = '../record/checkpoints_%d/best_%s.pth' % (opts.expnum, opts.model)
+        model.load_state_dict(torch.load(best_ckpt, map_location=torch.device('cpu'))["model_state"])
+        model.to(device)
+        score1, score2, score3, score4 = test(model=model, test_loader=test_loader, device=device, metrics=(metrics_1,metrics_3,metrics_4,metrics_5))
+        pp1 = metrics_1.to_str(score1)
+        pp2 = metrics_2.to_str(score2)
+        pp3 = metrics_3.to_str(score3)
+        pp4 = metrics_4.to_str(score4)
+        
+    
     device1 = torch.device('cpu')
     Total_Params = stat(model.to(device1), (opts.input_channel, opts.crop_size, opts.crop_size))
     #Save 'config_info' and 'best_info'
@@ -485,8 +561,15 @@ def main():
     print('主左作物行_best_iou:\n', best_info_pp2)
     print('主右作物行_best_iou:\n', best_info_pp3)
     print('导航线_best_iou:\n', best_info_pp4)
-
-
-
+    if opts.need_test:
+        print('\n\ntest-作物行IOU: %f'%score1['Class IoU'][1])
+        print('test-主左作物行IOU: %f'%score2['Class IoU'][1])
+        print('test-主右作物行IOU: %f'%score3['Class IoU'][1])
+        print('test-导航线IOU: %f'%score4['Class IoU'][1])
+        with open(logs_filename,'a') as f:
+            f.write(f'\n\ntest-作物行:\n{pp1}\n\ntest-主左作物行:\n{pp2}\n\ntest-主右作物行:\n{pp3}\n\ntest-导航线:\n{pp4}')
+        
+        
+        
 if __name__=='__main__':
     main()

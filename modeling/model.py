@@ -357,10 +357,10 @@ class AttU_Net(nn.Module):
 
         self.Conv = nn.Conv2d(filters[0], self.n_classes, kernel_size=1, stride=1, padding=0)
 
-        self.SE1 = SELayer_2d(filters[3])
-        self.SE2 = SELayer_2d(filters[2])
-        self.SE3 = SELayer_2d(filters[1])
-        self.SE4 = SELayer_2d(filters[0])
+        # self.SE1 = SELayer_2d(filters[3])
+        # self.SE2 = SELayer_2d(filters[2])
+        # self.SE3 = SELayer_2d(filters[1])
+        # self.SE4 = SELayer_2d(filters[0])
         
 
 
@@ -451,7 +451,7 @@ class DGLNet(nn.Module):
 
         # self.head = DGLNet_Head(n1)
         # self.head = DGLNet_Head2(n1)
-        self.head = DGLNet_Head3(n1)
+        self.head = DGLNet_Head4(n1)
         
         # self.Conv = nn.Conv2d(filters[0], self.n_classes, kernel_size=1, stride=1, padding=0)
 

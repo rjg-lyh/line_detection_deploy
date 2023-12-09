@@ -31,7 +31,7 @@ def get_argparser():
                         help='the note of the train experiment')
     
     #Experiment number
-    parser.add_argument('--expnum',  type=int, default=3,
+    parser.add_argument('--expnum',  type=int, default=7,
                         help='the number of my train')
     parser.add_argument("--batch_size", type=int, default=3,
                         help='batch size (default: 6)')
@@ -107,7 +107,7 @@ def get_dataset(opts):
     """
     train_transform = et.ExtCompose([
             #et.ExtRandomHorizontalFlip(),
-            et.ExtRandomRotation((-2.0, 2.0)),
+            et.ExtRandomRotation((-4.0, 4.0)),
             et.ExtResize(size=[opts.crop_size, opts.crop_size]),
             #et.ExtRandomScale((0.5, 2.0)),
             #et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size), pad_if_needed=True),

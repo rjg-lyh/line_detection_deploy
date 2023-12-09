@@ -31,7 +31,7 @@ def get_argparser():
                         help='the note of the train experiment')
     
     #Experiment number
-    parser.add_argument('--expnum',  type=int, default=3,
+    parser.add_argument('--expnum',  type=int, default=8,
                         help='the number of my train')
     parser.add_argument("--batch_size", type=int, default=3,
                         help='batch size (default: 6)')
@@ -107,7 +107,7 @@ def get_dataset(opts):
     """
     train_transform = et.ExtCompose([
             #et.ExtRandomHorizontalFlip(),
-            et.ExtRandomRotation((-2.0, 2.0)),
+            et.ExtRandomRotation((-4.0, 4.0)),
             et.ExtResize(size=[opts.crop_size, opts.crop_size]),
             #et.ExtRandomScale((0.5, 2.0)),
             #et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size), pad_if_needed=True),
@@ -451,7 +451,7 @@ def main():
             loss2 = criterion(outputs[:,1].unsqueeze(1), lbl1)
             loss3 = criterion(outputs[:,2].unsqueeze(1), lbl2)
             loss4 = criterion(outputs[:,3].unsqueeze(1), lbl4)
-            loss = 0.2*loss1 + 0.2*loss2 + 0.2*loss3 + 0.4*loss4
+            loss = 0.15*loss1 + 0.15*loss2 + 0.15*loss3 + 0.55*loss4
 
             loss.backward()
             optimizer.step()

@@ -30,14 +30,14 @@ def get_argparser():
     parser.add_argument('--note',  type=str, default='Test Code: all_rows, left_main, right_main, navigation_line Detector',
                         help='the note of the train experiment')
     
-    parser.add_argument('--expnum',  type=int, default=7,
+    parser.add_argument('--expnum',  type=int, default=4,
                         help='the number of my train')
-    parser.add_argument("--ckpt", default='/root/project/record/checkpoints_4/best_DGLNet_noxuan.pth', type=str,
+    parser.add_argument("--ckpt", default='/root/project/record/checkpoints_7/best_DGLNet.pth', type=str,
                         help="restore from checkpoint")
     parser.add_argument('--model', type=str, default='DGLNet',
                         choices=['UNet', 'DGLNet', 'AttU_Net', 'Scnn_AttU_Net', 'R2AttU_Net', 'deeplab_resnet50', 'deeplab_mobilenetv2'],
                         help='model name')
-    parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/test_dataset',
+    parser.add_argument('--data_root', type=str, default='/root/autodl-tmp/test_dataset2',
                         help='path to Dataset')
     # parser.add_argument("--save_val_results", action='store_false', default=True,
     #                     help="save segmentation results to \"./results\"")
